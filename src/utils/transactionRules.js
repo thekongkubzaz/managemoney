@@ -19,6 +19,11 @@ function isHelpCommand(text) {
   return keywords.some(k => text.toLowerCase().includes(k));
 }
 
+function isEditOrDeleteCommand(text) {
+  const keywords = ['แก้ไข', 'ลบ', 'ลบออก', 'edit', 'delete', 'ยกเลิกรายการ', 'แก้'];
+  return keywords.some(k => text.toLowerCase().includes(k));
+}
+
 function isGreeting(text) {
   const keywords = ['สวัสดี', 'หวัดดี', 'hello', 'hi', 'ดีจ้า', 'ดีครับ', 'ดีค่ะ'];
   return keywords.some(k => text.toLowerCase().includes(k));
@@ -58,4 +63,5 @@ module.exports = {
   isAnalysisRequest,
   shouldAutoSaveTransaction,
   toTransactionData,
+  isEditOrDeleteCommand,
 };

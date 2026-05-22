@@ -6,7 +6,7 @@ const { setPending, clearPending } = require('../state/pendingConfirmations');
 const {
   shouldAutoSave, isQueryCommand, isHelpCommand,
   isGreeting, isHelpRequest, isAnalysisRequest,
-  shouldAutoSaveTransaction, toTransactionData,
+  shouldAutoSaveTransaction, toTransactionData, isEditOrDeleteCommand,
 } = require('../utils/transactionRules');
 const { resolveDate } = require('../utils/dateParser');
 const { CONFIRM_YES, CONFIRM_NO } = require('../constants/confirmations');
@@ -137,6 +137,18 @@ async function handlePendingConfirmation(userId, userMessage) {
 
   const normalizedMessage = userMessage.trim().toLowerCase();
 
+  // กรณีรอรับจำนวนเงิน
+  if (pendingData._waitingFor === 'amount') {
+    const amountMatch = userMessage.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+    if (amountMatch) {
+      const updatedData = { ...pendingData, amount: parseFloat(amountMatch[0]) };
+      delete updatedData._waitingFor;
+      clearPending(userId);
+      return saveAndBuildReply(toTransactionData(updatedData), userId);
+    }
+    return '⚠️ ไม่เจอจำนวนเงินครับ กรุณาพิมพ์ตัวเลข เช่น "150"';
+  }
+
   if (CONFIRM_YES.some((word) => normalizedMessage === word)) {
     clearPending(userId);
     return saveAndBuildReply(pendingData, userId);
@@ -153,6 +165,13 @@ async function handlePendingConfirmation(userId, userMessage) {
 async function handleTextMessage(userId, userMessage) {
   const pendingReply = await handlePendingConfirmation(userId, userMessage);
   if (pendingReply) return pendingReply;
+
+  if (isEditOrDeleteCommand(userMessage)) {
+    return {
+      type: 'text',
+      text: '⚠️ ขณะนี้ยังไม่รองรับการแก้ไข/ลบรายการครับ\nกรุณาพิมพ์รายการใหม่ได้เลย',
+    };
+  }
 
   if (isGreeting(userMessage)) {
     return GENERAL_RESPONSES.greeting;
