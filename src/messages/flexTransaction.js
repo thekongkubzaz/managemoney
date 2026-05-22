@@ -9,7 +9,7 @@ function buildTransactionFlex(transaction) {
   const headerText = isIncome ? 'บันทึกรายรับ' : 'บันทึกรายจ่าย';
   const dateStr = formatDateThai(transaction.date);
 
-  const comment = getPersonalityComment(transaction.type, transaction.category);
+  const comment = getPersonalityComment(transaction.type, transaction.category, Number(transaction.amount));
 
   return {
     type: 'flex',

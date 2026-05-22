@@ -54,11 +54,31 @@ const INCOME_COMMENTS = {
   ],
 };
 
-function getPersonalityComment(type, category) {
+function getPersonalityComment(type, category, amount = 0) {
   if (type === 'รายรับ') {
     const comments = INCOME_COMMENTS[category] || INCOME_COMMENTS.default;
     return comments[Math.floor(Math.random() * comments.length)];
   }
+
+  // ── เงื่อนไขพิเศษตามจำนวนเงิน ──────────────────────
+  if (amount > 1000) {
+    const bigSpendComments = [
+      'ของมันต้องมีสินะครับ 😏💸',
+      'จ่ายหนักเลยครับวันนี้! ของมันต้องมีสินะ 💸',
+      'เงินออกหนักครับ แต่ถ้าคุ้มก็โอเคนะครับ 😅',
+    ];
+    return bigSpendComments[Math.floor(Math.random() * bigSpendComments.length)];
+  }
+
+  if (category === 'อาหาร' && amount > 300) {
+    const luxuryFoodComments = [
+      'กินหรูอยู่สบายครับวันนี้ 🍽️✨',
+      'มื้อนี้หรูหน่อยนะครับ กินหรูอยู่สบายเลย 😄',
+      'อาหารดีราคานี้ถือว่าคุ้มครับ กินหรูอยู่สบาย 🥂',
+    ];
+    return luxuryFoodComments[Math.floor(Math.random() * luxuryFoodComments.length)];
+  }
+
   const comments = EXPENSE_COMMENTS[category] || EXPENSE_COMMENTS.default;
   return comments[Math.floor(Math.random() * comments.length)];
 }
