@@ -2,6 +2,7 @@ const express = require('express');
 const line = require('@line/bot-sdk');
 const { config } = require('./config');
 const { handleEvent } = require('./services/lineService');
+const { sendDailyReminder } = require('./cron/dailyReminder');
 
 function createApp() {
   const app = express();
@@ -18,6 +19,21 @@ function createApp() {
   });
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  // Cron endpoint — เรียกโดย Render Cron Job หรือ UptimeRobot
+  app.post('/cron/daily-reminder', async (req, res) => {
+    const secret = req.headers['x-cron-secret'];
+    if (secret !== process.env.CRON_SECRET) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    try {
+      const result = await sendDailyReminder();
+      return res.json({ status: 'ok', ...result });
+    } catch (err) {
+      console.error('❌ Cron error:', err);
+      return res.status(500).json({ status: 'error', message: err.message });
+    }
   });
   app.post('/webhook', lineMiddleware, async (req, res) => {
     try {

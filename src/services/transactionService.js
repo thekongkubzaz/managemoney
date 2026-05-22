@@ -1,5 +1,6 @@
 const { supabase, TABLE } = require('./supabaseClient');
 const { resolveDate, getTodayStr } = require('../utils/dateParser');
+const { appendTransaction } = require('./sheetsService');
 
 async function saveTransaction({ item, amount, category, type, date, lineUserId }) {
   const resolvedDate = resolveDate(date) || getTodayStr();
@@ -18,6 +19,10 @@ async function saveTransaction({ item, amount, category, type, date, lineUserId 
     .single();
 
   if (error) throw error;
+
+  // Sync to Google Sheets (non-blocking)
+  appendTransaction(data).catch(() => {});
+
   return data;
 }
 

@@ -1,5 +1,6 @@
 const { formatDateThai } = require('../utils/dateParser');
 const { formatMoney } = require('../utils/moneyParser');
+const { getPersonalityComment } = require('./personality');
 
 function buildTransactionFlex(transaction) {
   const isIncome = transaction.type === 'รายรับ';
@@ -7,6 +8,8 @@ function buildTransactionFlex(transaction) {
   const emoji = isIncome ? '💚' : '❤️';
   const headerText = isIncome ? 'บันทึกรายรับ' : 'บันทึกรายจ่าย';
   const dateStr = formatDateThai(transaction.date);
+
+  const comment = getPersonalityComment(transaction.type, transaction.category);
 
   return {
     type: 'flex',
@@ -39,6 +42,15 @@ function buildTransactionFlex(transaction) {
           row('💵 จำนวน', `฿${formatMoney(Number(transaction.amount))}`),
           row('🏷 หมวด', transaction.category),
           row('📅 วันที่', dateStr),
+          { type: 'separator', margin: 'sm' },
+          {
+            type: 'text',
+            text: comment,
+            size: 'xs',
+            color: '#888888',
+            wrap: true,
+            margin: 'sm',
+          },
         ],
       },
       styles: {
