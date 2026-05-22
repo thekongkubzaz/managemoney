@@ -1,5 +1,5 @@
 const { parseTransaction, parseExpenseMessage } = require('../services/geminiService');
-const { setBudget, getBudgetSummary, getCurrentMonth } = require('../services/budgetService');
+const { setBudget, getBudgetSummary, getBudgetWarning, getCurrentMonth } = require('../services/budgetService');
 const { buildBudgetFlex, buildBudgetSetFlex } = require('../messages/flexBudget');
 const { saveTransaction, getMonthlySummary, saveAndBuildReply, findMatchingTransactions, deleteTransaction } = require('../services/transactionService');
 const { replyMessage } = require('../services/lineService');
@@ -134,7 +134,8 @@ async function handleSummary(replyToken, userId) {
 }
 
 function isBudgetSetCommand(text) {
-  return /^(ตั้งงบ|ตั้งงบประมาณ|งบ)\s+.+\s+\d+/i.test(text.trim());
+  // รองรับ: "ตั้งงบ อาหาร 3000" และ "ตั้งงบอาหารเดือนนี้ 5000"
+  return /^(ตั้งงบ|ตั้งงบประมาณ|งบ)/.test(text.trim()) && /\d+/.test(text);
 }
 
 function isBudgetViewCommand(text) {
@@ -142,16 +143,25 @@ function isBudgetViewCommand(text) {
   return keywords.some(k => text.includes(k));
 }
 
-async function handleSetBudget(userId, userMessage) {
-  const match = userMessage.trim().match(/^(ตั้งงบ|ตั้งงบประมาณ|งบ)\s+(.+?)\s+(\d[\d,.]*)$/i);
-  if (!match) {
-    return { type: 'text', text: '⚠️ รูปแบบไม่ถูกต้องครับ เช่น "ตั้งงบ อาหาร 3000"' };
-  }
-  const category = match[2].trim();
-  const amount = parseFloat(match[3].replace(/,/g, ''));
-  const month = getCurrentMonth();
+function parseBudgetCommand(text) {
+  // รูปแบบ 1: "ตั้งงบ อาหาร 3000"
+  const fmt1 = text.match(/^(ตั้งงบ|ตั้งงบประมาณ|งบ)\s+(.+?)\s+(\d[\d,.]*)$/);
+  if (fmt1) return { category: fmt1[2].trim(), amount: parseFloat(fmt1[3].replace(/,/g, '')) };
 
-  const result = await setBudget(userId, category, amount, month);
+  // รูปแบบ 2: "ตั้งงบอาหารเดือนนี้ 5000" หรือ "ตั้งงบอาหาร 5000"
+  const fmt2 = text.match(/^(ตั้งงบ|ตั้งงบประมาณ|งบ)(.+?)(เดือนนี้|เดือน\S*)?\s+(\d[\d,.]*)$/);
+  if (fmt2) return { category: fmt2[2].trim(), amount: parseFloat(fmt2[4].replace(/,/g, '')) };
+
+  return null;
+}
+
+async function handleSetBudget(userId, userMessage) {
+  const parsed = parseBudgetCommand(userMessage.trim());
+  if (!parsed) {
+    return { type: 'text', text: '⚠️ รูปแบบไม่ถูกต้องครับ เช่น\n• "ตั้งงบ อาหาร 3000"\n• "ตั้งงบอาหารเดือนนี้ 5000"' };
+  }
+  const month = getCurrentMonth();
+  const result = await setBudget(userId, parsed.category, parsed.amount, month);
   return buildBudgetSetFlex(result, result.isUpdate, month);
 }
 
@@ -223,7 +233,13 @@ async function handlePendingConfirmation(userId, userMessage) {
 
   if (CONFIRM_YES.some((word) => normalizedMessage === word)) {
     clearPending(userId);
-    return saveAndBuildReply(pendingData, userId);
+    const reply = await saveAndBuildReply(pendingData, userId);
+    // เช็คงบประมาณหลังบันทึก
+    const warning = pendingData.type === 'รายจ่าย'
+      ? await getBudgetWarning(userId, pendingData.category)
+      : null;
+    if (warning) return [reply, { type: 'text', text: warning }];
+    return reply;
   }
 
   if (CONFIRM_NO.some((word) => normalizedMessage === word)) {

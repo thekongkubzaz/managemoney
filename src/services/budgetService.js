@@ -81,4 +81,43 @@ async function getBudgetSummary(lineUserId, month = getCurrentMonth()) {
   }));
 }
 
-module.exports = { setBudget, getBudgets, getBudgetSummary, getCurrentMonth };
+async function getBudgetWarning(lineUserId, category, month = getCurrentMonth()) {
+  const budgets = await getBudgets(lineUserId, month);
+  const budget = budgets.find(b => b.category === category);
+  if (!budget) return null;
+
+  // คำนวณยอดใช้จริงเดือนนี้
+  const startDate = `${month}-01`;
+  const endDate = new Date(month.split('-')[0], month.split('-')[1], 0)
+    .toISOString().split('T')[0];
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('amount')
+    .eq('line_user_id', lineUserId)
+    .eq('category', category)
+    .eq('type', 'รายจ่าย')
+    .gte('date', startDate)
+    .lte('date', endDate);
+
+  if (error) return null;
+
+  const actual = (data || []).reduce((s, t) => s + Number(t.amount), 0);
+  const budgetAmount = Number(budget.amount);
+  const remaining = budgetAmount - actual;
+  const pct = Math.round((actual / budgetAmount) * 100);
+
+  if (pct >= 100) {
+    return `⚠️ เดือนนี้หมวด${category}ใช้เกินงบแล้วครับ!\nใช้ไป ฿${formatMoney(actual)} จากงบ ฿${formatMoney(budgetAmount)}\nเกินมา ฿${formatMoney(Math.abs(remaining))} บาท`;
+  }
+  if (pct >= 80) {
+    return `🔔 เดือนนี้หมวด${category}ใช้ไป ฿${formatMoney(actual)} จากงบ ฿${formatMoney(budgetAmount)} แล้วนะครับ\nเหลืออีกแค่ ฿${formatMoney(remaining)} บาท`;
+  }
+  return null;
+}
+
+function formatMoney(amount) {
+  return Number(amount).toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+
+module.exports = { setBudget, getBudgets, getBudgetSummary, getBudgetWarning, getCurrentMonth };
