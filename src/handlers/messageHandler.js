@@ -1,5 +1,5 @@
 const { parseTransaction, parseExpenseMessage } = require('../services/geminiService');
-const { saveTransaction, getMonthlySummary, saveAndBuildReply } = require('../services/transactionService');
+const { saveTransaction, getMonthlySummary, saveAndBuildReply, findMatchingTransactions, deleteTransaction } = require('../services/transactionService');
 const { replyMessage } = require('../services/lineService');
 const pending = require('../state/pendingConfirmations');
 const { setPending, clearPending } = require('../state/pendingConfirmations');
@@ -131,11 +131,53 @@ async function handleSummary(replyToken, userId) {
   return await replyMessage(replyToken, buildSummaryFlex(summary));
 }
 
+async function handleDeleteCommand(userId, userMessage) {
+  // ดึงคีย์เวิร์ดและจำนวนเงินจาก "ลบ กินข้าว 100"
+  const text = userMessage.replace(/^(ลบ|แก้ไขลบ|ลบรายการ)\s*/i, '').trim();
+  const amountMatch = text.replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  const amount = amountMatch ? parseFloat(amountMatch[0]) : null;
+  const keyword = text.replace(/\d[\d,.]*/g, '').trim();
+
+  const matches = await findMatchingTransactions(userId, keyword, amount);
+
+  if (matches.length === 0) {
+    return { type: 'text', text: `🔍 ไม่เจอรายการ "${text}" ครับ` };
+  }
+
+  const target = matches[0]; // เอารายการล่าสุดที่ตรงกัน
+  setPending(userId, { _waitingFor: 'delete_confirm', _deleteId: target.id, _deleteItem: target });
+
+  return {
+    type: 'text',
+    text: `🗑 ยืนยันลบรายการนี้?\n\n${target.type === 'รายรับ' ? '💚' : '❤️'} ${target.type}\n📝 ${target.item}\n💵 ฿${Number(target.amount).toLocaleString()}\n🏷 ${target.category}\n📅 ${target.date}`,
+    quickReply: {
+      items: [
+        { type: 'action', action: { type: 'message', label: '🗑 ลบเลย', text: 'ยืนยันลบ' } },
+        { type: 'action', action: { type: 'message', label: '❌ ยกเลิก', text: 'ยกเลิก' } },
+      ],
+    },
+  };
+}
+
 async function handlePendingConfirmation(userId, userMessage) {
   const pendingData = pending.get(userId);
   if (!pendingData) return null;
 
   const normalizedMessage = userMessage.trim().toLowerCase();
+
+  // กรณียืนยันลบ
+  if (pendingData._waitingFor === 'delete_confirm') {
+    if (CONFIRM_YES.some((word) => normalizedMessage === word) || normalizedMessage === 'ยืนยันลบ') {
+      clearPending(userId);
+      await deleteTransaction(pendingData._deleteId);
+      const item = pendingData._deleteItem;
+      return { type: 'text', text: `✅ ลบรายการแล้วครับ\n📝 ${item.item} ฿${Number(item.amount).toLocaleString()}` };
+    }
+    if (CONFIRM_NO.some((word) => normalizedMessage === word)) {
+      clearPending(userId);
+      return { type: 'text', text: '↩️ ยกเลิกการลบแล้วครับ' };
+    }
+  }
 
   // กรณีรอรับจำนวนเงิน
   if (pendingData._waitingFor === 'amount') {
@@ -167,10 +209,7 @@ async function handleTextMessage(userId, userMessage) {
   if (pendingReply) return pendingReply;
 
   if (isEditOrDeleteCommand(userMessage)) {
-    return {
-      type: 'text',
-      text: '⚠️ ขณะนี้ยังไม่รองรับการแก้ไข/ลบรายการครับ\nกรุณาพิมพ์รายการใหม่ได้เลย',
-    };
+    return handleDeleteCommand(userId, userMessage);
   }
 
   if (isGreeting(userMessage)) {

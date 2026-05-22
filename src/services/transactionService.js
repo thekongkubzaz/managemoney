@@ -89,10 +89,32 @@ async function getTransactions({ lineUserId, type, category, startDate, endDate,
   return data;
 }
 
+async function findMatchingTransactions(lineUserId, keyword, amount) {
+  let query = supabase
+    .from(TABLE)
+    .select('*')
+    .eq('line_user_id', lineUserId)
+    .order('date', { ascending: false })
+    .limit(10);
+
+  if (keyword) query = query.ilike('item', `%${keyword}%`);
+  if (amount)  query = query.eq('amount', amount);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+async function deleteTransaction(id) {
+  const { error } = await supabase.from(TABLE).delete().eq('id', id);
+  if (error) throw error;
+  return true;
+}
+
 async function saveAndBuildReply(transactionData, userId) {
   const { buildTransactionFlex } = require('../messages/flexTransaction');
   const saved = await saveTransaction({ ...transactionData, lineUserId: userId });
   return buildTransactionFlex(saved);
 }
 
-module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions, getTransactions, saveAndBuildReply };
+module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions, getTransactions, saveAndBuildReply, findMatchingTransactions, deleteTransaction };
