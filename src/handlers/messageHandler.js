@@ -1,4 +1,6 @@
 const { parseTransaction, parseExpenseMessage } = require('../services/geminiService');
+const { setBudget, getBudgetSummary, getCurrentMonth } = require('../services/budgetService');
+const { buildBudgetFlex, buildBudgetSetFlex } = require('../messages/flexBudget');
 const { saveTransaction, getMonthlySummary, saveAndBuildReply, findMatchingTransactions, deleteTransaction } = require('../services/transactionService');
 const { replyMessage } = require('../services/lineService');
 const pending = require('../state/pendingConfirmations');
@@ -131,6 +133,34 @@ async function handleSummary(replyToken, userId) {
   return await replyMessage(replyToken, buildSummaryFlex(summary));
 }
 
+function isBudgetSetCommand(text) {
+  return /^(ตั้งงบ|ตั้งงบประมาณ|งบ)\s+.+\s+\d+/i.test(text.trim());
+}
+
+function isBudgetViewCommand(text) {
+  const keywords = ['ดูงบ', 'งบประมาณ', 'งบเดือนนี้', 'ดูงบประมาณ'];
+  return keywords.some(k => text.includes(k));
+}
+
+async function handleSetBudget(userId, userMessage) {
+  const match = userMessage.trim().match(/^(ตั้งงบ|ตั้งงบประมาณ|งบ)\s+(.+?)\s+(\d[\d,.]*)$/i);
+  if (!match) {
+    return { type: 'text', text: '⚠️ รูปแบบไม่ถูกต้องครับ เช่น "ตั้งงบ อาหาร 3000"' };
+  }
+  const category = match[2].trim();
+  const amount = parseFloat(match[3].replace(/,/g, ''));
+  const month = getCurrentMonth();
+
+  const result = await setBudget(userId, category, amount, month);
+  return buildBudgetSetFlex(result, result.isUpdate, month);
+}
+
+async function handleViewBudget(userId) {
+  const month = getCurrentMonth();
+  const summary = await getBudgetSummary(userId, month);
+  return buildBudgetFlex(summary, month);
+}
+
 async function handleDeleteCommand(userId, userMessage) {
   // ดึงคีย์เวิร์ดและจำนวนเงินจาก "ลบ กินข้าว 100"
   const text = userMessage.replace(/^(ลบ|แก้ไขลบ|ลบรายการ)\s*/i, '').trim();
@@ -207,6 +237,14 @@ async function handlePendingConfirmation(userId, userMessage) {
 async function handleTextMessage(userId, userMessage) {
   const pendingReply = await handlePendingConfirmation(userId, userMessage);
   if (pendingReply) return pendingReply;
+
+  if (isBudgetSetCommand(userMessage)) {
+    return handleSetBudget(userId, userMessage);
+  }
+
+  if (isBudgetViewCommand(userMessage)) {
+    return handleViewBudget(userId);
+  }
 
   if (isEditOrDeleteCommand(userMessage)) {
     return handleDeleteCommand(userId, userMessage);

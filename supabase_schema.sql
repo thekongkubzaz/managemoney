@@ -23,3 +23,32 @@ CREATE POLICY "Allow all selects" ON transactions
 -- Index สำหรับ query เร็วขึ้น
 CREATE INDEX idx_transactions_user ON transactions (line_user_id);
 CREATE INDEX idx_transactions_date ON transactions (date);
+
+-- ─────────────────────────────────────────────
+-- ตาราง budgets (งบประมาณรายเดือน)
+-- ─────────────────────────────────────────────
+CREATE TABLE budgets (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  line_user_id TEXT NOT NULL,
+  category TEXT NOT NULL,
+  amount NUMERIC NOT NULL,
+  month TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE budgets ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all inserts on budgets" ON budgets
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow all selects on budgets" ON budgets
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow all updates on budgets" ON budgets
+  FOR UPDATE USING (true);
+
+CREATE POLICY "Allow all deletes on budgets" ON budgets
+  FOR DELETE USING (true);
+
+CREATE INDEX idx_budgets_user ON budgets (line_user_id);
+CREATE INDEX idx_budgets_month ON budgets (month);
