@@ -16,4 +16,12 @@ function clear(userId) {
   pending.delete(userId);
 }
 
-module.exports = { set, get, clear };
+function setPending(userId, data) {
+  pending.set(userId, data);
+}
+
+function clearPending(userId) {
+  pending.delete(userId);
+}
+
+module.exports = { set, get, clear, setPending, clearPending };

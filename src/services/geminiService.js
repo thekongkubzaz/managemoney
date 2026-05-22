@@ -1,13 +1,20 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
-const config = require('../config');
-const { buildParsePrompt } = require('../constants/prompts');
-const { getTodayStr } = require('../utils/dateParser');
+const { config } = require('../config');
+const { buildParsePrompt, buildSystemPrompt, buildUserPrompt } = require('../constants/prompts');
+const { getTodayStr, getToday, getYesterday } = require('../utils/dateParser');
+const { sanitizeResult, fallbackParse } = require('../utils/moneyParser');
 
 const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
+const model = genAI.getGenerativeModel({
+  model: config.gemini.model,
+  generationConfig: {
+    responseMimeType: 'application/json',
+    temperature: 0.15,
+  },
+});
 
 async function parseTransaction(userMessage) {
   try {
-    const model = genAI.getGenerativeModel({ model: config.gemini.model });
     const todayStr = getTodayStr();
     const prompt = buildParsePrompt(userMessage, todayStr);
 
@@ -25,4 +32,28 @@ async function parseTransaction(userMessage) {
   }
 }
 
-module.exports = { parseTransaction };
+async function parseExpenseMessage(userMessage) {
+  try {
+    const today = getToday();
+    const yesterday = getYesterday();
+
+    const systemPrompt = buildSystemPrompt(today, yesterday);
+    const userPrompt = buildUserPrompt(userMessage);
+    const result = await model.generateContent({
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: systemPrompt + '\n\n' + userPrompt }],
+        },
+      ],
+    });
+    const responseText = result.response.text();
+    const parsed = JSON.parse(responseText);
+    return sanitizeResult(parsed, userMessage);
+  } catch (error) {
+    console.error('❌ Gemini AI Error:', error.message);
+    return fallbackParse(userMessage);
+  }
+}
+
+module.exports = { parseTransaction, parseExpenseMessage };

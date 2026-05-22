@@ -1,14 +1,11 @@
-const { createClient } = require('@supabase/supabase-js');
-const config = require('../config');
+const { supabase, TABLE } = require('./supabaseClient');
 const { resolveDate, getTodayStr } = require('../utils/dateParser');
-
-const supabase = createClient(config.supabase.url, config.supabase.anonKey);
 
 async function saveTransaction({ item, amount, category, type, date, lineUserId }) {
   const resolvedDate = resolveDate(date) || getTodayStr();
 
   const { data, error } = await supabase
-    .from('transactions')
+    .from(TABLE)
     .insert([{
       item,
       amount,
@@ -30,7 +27,7 @@ async function getMonthlySummary(lineUserId) {
   const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
   const { data, error } = await supabase
-    .from('transactions')
+    .from(TABLE)
     .select('*')
     .eq('line_user_id', lineUserId)
     .gte('date', firstDay)
@@ -65,7 +62,7 @@ async function getMonthlySummary(lineUserId) {
 
 async function getRecentTransactions(lineUserId, limit = 10) {
   const { data, error } = await supabase
-    .from('transactions')
+    .from(TABLE)
     .select('*')
     .eq('line_user_id', lineUserId)
     .order('date', { ascending: false })
@@ -76,4 +73,20 @@ async function getRecentTransactions(lineUserId, limit = 10) {
   return data;
 }
 
-module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions };
+async function getTransactions({ lineUserId, type, category, startDate, endDate, limit = 50 } = {}) {
+  let query = supabase.from(TABLE).select('*');
+
+  if (lineUserId) query = query.eq('line_user_id', lineUserId);
+  if (type)       query = query.eq('type', type);
+  if (category)   query = query.eq('category', category);
+  if (startDate)  query = query.gte('date', startDate);
+  if (endDate)    query = query.lte('date', endDate);
+
+  query = query.order('date', { ascending: false }).limit(limit);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions, getTransactions };

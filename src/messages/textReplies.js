@@ -59,6 +59,33 @@ function errorMessage() {
   };
 }
 
+function generateConfirmQuickReply(transactionData) {
+  return {
+    type: 'text',
+    text: `🤔 ยืนยันการบันทึก?\n\n${transactionData.type === 'รายรับ' ? '💚' : '❤️'} ${transactionData.type}\n📝 ${transactionData.item}\n💵 ฿${Number(transactionData.amount || 0).toLocaleString()}\n🏷 ${transactionData.category}`,
+    quickReply: {
+      items: [
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '✅ ใช่',
+            text: 'ใช่',
+          },
+        },
+        {
+          type: 'action',
+          action: {
+            type: 'message',
+            label: '❌ ยกเลิก',
+            text: 'ยกเลิก',
+          },
+        },
+      ],
+    },
+  };
+}
+
 module.exports = {
   helpMessage,
   confirmMessage,
@@ -67,4 +94,5 @@ module.exports = {
   cancelledMessage,
   unknownMessage,
   errorMessage,
+  generateConfirmQuickReply,
 };

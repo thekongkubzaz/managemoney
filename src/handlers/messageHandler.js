@@ -2,8 +2,10 @@ const { parseTransaction } = require('../services/geminiService');
 const { saveTransaction, getMonthlySummary } = require('../services/transactionService');
 const { replyMessage } = require('../services/lineService');
 const pending = require('../state/pendingConfirmations');
+const { setPending, clearPending } = require('../state/pendingConfirmations');
 const { shouldAutoSave, isQueryCommand, isHelpCommand } = require('../utils/transactionRules');
 const { resolveDate } = require('../utils/dateParser');
+const { CONFIRM_YES, CONFIRM_NO } = require('../constants/confirmations');
 const {
   helpMessage,
   confirmMessage,
@@ -121,4 +123,69 @@ async function handleSummary(replyToken, userId) {
   return await replyMessage(replyToken, buildSummaryFlex(summary));
 }
 
-module.exports = { handleMessage };
+async function handlePendingConfirmation(userId, userMessage) {
+  const pendingData = pending.get(userId);
+  if (!pendingData) return null;
+
+  const normalizedMessage = userMessage.trim().toLowerCase();
+
+  if (CONFIRM_YES.some((word) => normalizedMessage === word)) {
+    clearPending(userId);
+    return saveAndBuildReply(pendingData, userId);
+  }
+
+  if (CONFIRM_NO.some((word) => normalizedMessage === word)) {
+    clearPending(userId);
+    return 'ยกเลิกแล้วครับ ถ้าจะบันทึกใหม่ พิมพ์รายการมาได้เลย';
+  }
+
+  return null;
+}
+
+async function handleTextMessage(userId, userMessage) {
+  const pendingReply = await handlePendingConfirmation(userId, userMessage);
+  if (pendingReply) return pendingReply;
+
+  if (isGreeting(userMessage)) {
+    return GENERAL_RESPONSES.greeting;
+  }
+
+  if (isHelpRequest(userMessage)) {
+    return GENERAL_RESPONSES.help;
+  }
+
+  if (isAnalysisRequest(userMessage)) {
+    return buildSummaryReply(userId, userMessage);
+  }
+
+  if (userMessage.length < 2) {
+    return GENERAL_RESPONSES.help;
+  }
+
+  try {
+    console.log(`📩 [${userId || 'unknown'}] "${userMessage}"`);
+    const parsed = await parseExpenseMessage(userMessage);
+    console.log('🤖 Gemini:', JSON.stringify(parsed));
+
+    if (parsed.missing_fields && parsed.missing_fields.length > 0) {
+      return generateMissingFieldReply(parsed.missing_fields, parsed);
+    }
+
+    const transactionData = toTransactionData(parsed);
+
+    if (shouldAutoSaveTransaction(parsed, userMessage)) {
+      return saveAndBuildReply(transactionData, userId);
+    }
+
+    if (userId) {
+      setPending(userId, transactionData);
+    }
+
+    return generateConfirmQuickReply(transactionData);
+  } catch (error) {
+    console.error('❌ Error handling message:', error);
+    return GENERAL_RESPONSES.error;
+  }
+}
+
+module.exports = { handleMessage, handleTextMessage, handlePendingConfirmation };
