@@ -185,8 +185,8 @@ async function handlePendingConfirmation(userId, userMessage) {
     if (amountMatch) {
       const updatedData = { ...pendingData, amount: parseFloat(amountMatch[0]) };
       delete updatedData._waitingFor;
-      clearPending(userId);
-      return saveAndBuildReply(toTransactionData(updatedData), userId);
+      setPending(userId, updatedData); // เก็บไว้รอยืนยัน
+      return generateConfirmQuickReply(toTransactionData(updatedData));
     }
     return '⚠️ ไม่เจอจำนวนเงินครับ กรุณาพิมพ์ตัวเลข เช่น "150"';
   }
