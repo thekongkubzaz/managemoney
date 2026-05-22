@@ -48,15 +48,22 @@ async function getMonthlySummary(lineUserId) {
   expense.forEach(t => {
     categoryMap[t.category] = (categoryMap[t.category] || 0) + Number(t.amount);
   });
-  const topCategory = Object.entries(categoryMap).sort((a, b) => b[1] - a[1])[0];
+  const categoryBreakdown = Object.entries(categoryMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([name, amount]) => ({ name, amount }));
+
+  const topCategory = categoryBreakdown[0] || null;
 
   return {
     totalIncome,
     totalExpense,
     balance,
-    topCategory: topCategory ? { name: topCategory[0], amount: topCategory[1] } : null,
+    topCategory,
+    categoryBreakdown,
     recentItems: data.slice(0, 5),
     month: `${now.getMonth() + 1}/${now.getFullYear()}`,
+    totalTransactions: data.length,
   };
 }
 
