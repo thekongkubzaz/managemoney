@@ -59,6 +59,47 @@ function errorMessage() {
   };
 }
 
+const GENERAL_RESPONSES = {
+  greeting: {
+    type: 'text',
+    text: '💰 สวัสดีครับ! พิมพ์รายการรายรับ/รายจ่ายได้เลย เช่น "กินข้าว 80" หรือพิมพ์ "ช่วยด้วย" เพื่อดูวิธีใช้',
+  },
+  help: {
+    type: 'text',
+    text: `💰 ManageMoney Bot\n\n📝 วิธีบันทึก:\n• "กินข้าวมันไก่ 80"\n• "ค่าแท็กซี่ 150"\n• "เงินเดือน 25000"\n\n📊 ดูสรุป:\n• พิมพ์ "สรุป" หรือ "ยอดเดือนนี้"`,
+  },
+  error: {
+    type: 'text',
+    text: '⚠️ เกิดข้อผิดพลาดครับ กรุณาลองใหม่อีกครั้ง',
+  },
+};
+
+function generateMissingFieldReply(missingFields, parsed) {
+  if (missingFields.includes('amount')) {
+    return {
+      type: 'text',
+      text: `💬 "${parsed.item || 'รายการนี้'}" มีจำนวนเงินเท่าไหร่ครับ?`,
+    };
+  }
+  if (missingFields.includes('type')) {
+    return {
+      type: 'text',
+      text: `💬 "${parsed.item || 'รายการนี้'}" เป็นรายรับหรือรายจ่ายครับ?`,
+    };
+  }
+  return {
+    type: 'text',
+    text: '💬 ช่วยบอกรายละเอียดเพิ่มเติมได้ไหมครับ?',
+  };
+}
+
+async function buildSummaryReply(userId) {
+  const { getMonthlySummary } = require('../services/transactionService');
+  const { buildSummaryFlex } = require('./flexSummary');
+  const summary = await getMonthlySummary(userId);
+  return buildSummaryFlex(summary);
+}
+
 function generateConfirmQuickReply(transactionData) {
   return {
     type: 'text',
@@ -95,4 +136,7 @@ module.exports = {
   unknownMessage,
   errorMessage,
   generateConfirmQuickReply,
+  generateMissingFieldReply,
+  buildSummaryReply,
+  GENERAL_RESPONSES,
 };

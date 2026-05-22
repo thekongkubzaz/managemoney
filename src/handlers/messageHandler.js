@@ -1,9 +1,13 @@
-const { parseTransaction } = require('../services/geminiService');
-const { saveTransaction, getMonthlySummary } = require('../services/transactionService');
+const { parseTransaction, parseExpenseMessage } = require('../services/geminiService');
+const { saveTransaction, getMonthlySummary, saveAndBuildReply } = require('../services/transactionService');
 const { replyMessage } = require('../services/lineService');
 const pending = require('../state/pendingConfirmations');
 const { setPending, clearPending } = require('../state/pendingConfirmations');
-const { shouldAutoSave, isQueryCommand, isHelpCommand } = require('../utils/transactionRules');
+const {
+  shouldAutoSave, isQueryCommand, isHelpCommand,
+  isGreeting, isHelpRequest, isAnalysisRequest,
+  shouldAutoSaveTransaction, toTransactionData,
+} = require('../utils/transactionRules');
 const { resolveDate } = require('../utils/dateParser');
 const { CONFIRM_YES, CONFIRM_NO } = require('../constants/confirmations');
 const {
@@ -14,6 +18,10 @@ const {
   errorMessage,
   buildTransactionFlex,
   buildSummaryFlex,
+  GENERAL_RESPONSES,
+  generateMissingFieldReply,
+  generateConfirmQuickReply,
+  buildSummaryReply,
 } = require('../messages');
 
 async function handleMessage(event) {

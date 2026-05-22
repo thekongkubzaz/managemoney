@@ -89,4 +89,10 @@ async function getTransactions({ lineUserId, type, category, startDate, endDate,
   return data;
 }
 
-module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions, getTransactions };
+async function saveAndBuildReply(transactionData, userId) {
+  const { buildTransactionFlex } = require('../messages/flexTransaction');
+  const saved = await saveTransaction({ ...transactionData, lineUserId: userId });
+  return buildTransactionFlex(saved);
+}
+
+module.exports = { saveTransaction, getMonthlySummary, getRecentTransactions, getTransactions, saveAndBuildReply };

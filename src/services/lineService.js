@@ -1,5 +1,5 @@
 const line = require('@line/bot-sdk');
-const config = require('../config');
+const { config } = require('../config');
 
 const client = new line.messagingApi.MessagingApiClient({
   channelAccessToken: config.line.channelAccessToken,
@@ -15,4 +15,23 @@ async function pushMessage(userId, messages) {
   return client.pushMessage({ to: userId, messages: msgs });
 }
 
-module.exports = { client, replyMessage, pushMessage };
+async function handleEvent(event) {
+  if (event.type !== 'message' || event.message.type !== 'text') return;
+
+  const { handleTextMessage } = require('../handlers/messageHandler');
+  const userId = event.source.userId;
+  const userMessage = event.message.text.trim();
+  const replyToken = event.replyToken;
+
+  const reply = await handleTextMessage(userId, userMessage);
+
+  if (!reply) return;
+
+  const messages = typeof reply === 'string'
+    ? [{ type: 'text', text: reply }]
+    : Array.isArray(reply) ? reply : [reply];
+
+  return client.replyMessage({ replyToken, messages });
+}
+
+module.exports = { client, replyMessage, pushMessage, handleEvent };
